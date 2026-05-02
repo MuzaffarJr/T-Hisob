@@ -20,7 +20,7 @@ BOT_TOKEN  = os.getenv("BOT_TOKEN")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "")
 UZB = timezone(timedelta(hours=5))
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
 dp  = Dispatcher(storage=MemoryStorage())
 
 
@@ -431,5 +431,7 @@ async def tax_calendar_scheduler():
 
 
 async def start_bot():
+    if not bot:
+        return
     asyncio.create_task(tax_calendar_scheduler())
     await dp.start_polling(bot)
