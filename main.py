@@ -52,7 +52,9 @@ def parse_dt(value) -> datetime | None:
 
 @app.on_event("startup")
 async def startup():
-    asyncio.create_task(start_bot())
+    import os
+    if os.getenv("RUN_BOT") == "1":
+        asyncio.create_task(start_bot())
 
 
 @app.get("/")
