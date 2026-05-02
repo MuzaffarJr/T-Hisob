@@ -4,3 +4,4 @@ sqlalchemy
 aiogram
 openai
 python-dotenv
+reportlab
