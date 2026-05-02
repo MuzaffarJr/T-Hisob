@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T-Hisob</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 16px 16px 80px;
+            color: #1e293b;
+        }
+
+        /* Header */
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 18px;
+        }
+        .header h1 { font-size: 18px; font-weight: 700; }
+        .header p  { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .avatar {
+            width: 36px; height: 36px; background: #dbeafe;
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 18px;
+        }
+
+        /* Accordion cards */
+        .acc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+        .acc-card {
+            background: white; border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden; cursor: pointer;
+            transition: box-shadow .2s;
+        }
+        .acc-card:active { box-shadow: 0 1px 4px rgba(0,0,0,0.12); transform: scale(.98); }
+        .acc-head { padding: 14px; }
+        .acc-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+        .acc-value { font-size: 17px; font-weight: 700; }
+        .acc-arrow { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+        .acc-body {
+            max-height: 0; overflow: hidden;
+            transition: max-height .35s ease;
+            border-top: 0px solid #f1f5f9;
+        }
+        .acc-body.open { max-height: 360px; border-top-width: 1px; }
+        .acc-body-inner { padding: 12px; }
+        .acc-add-btn {
+            display: block; width: 100%; margin-top: 10px;
+            padding: 8px; border-radius: 10px; border: none;
+            font-size: 12px; font-weight: 600; cursor: pointer;
+        }
+        .green  { color: #16a34a; }
+        .red    { color: #dc2626; }
+        .orange { color: #ea580c; }
+
+        /* Summary cards */
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+        .card {
+            background: white; border-radius: 14px;
+            padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+        .card-value { font-size: 15px; font-weight: 700; }
+        .border-orange { border-left: 4px solid #f97316; }
+
+        /* P&L */
+        .section {
+            background: white; border-radius: 14px; padding: 14px;
+            margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .section-title { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 10px; }
+        .pnl-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; }
+        .pnl-row.divider { border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 10px; }
+        .pnl-label { color: #64748b; }
+        .pnl-value { font-weight: 600; }
+
+        /* Refresh row */
+        .refresh-row { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+        .refresh-btn {
+            background: white; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 8px 14px; font-size: 12px; cursor: pointer;
+        }
+
+        /* Status */
+        .status { text-align: center; font-size: 12px; color: #94a3b8; margin-top: 6px; }
+        .chart-empty { text-align: center; font-size: 12px; color: #94a3b8; padding: 20px 0; }
+        .deadline-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px;
+        }
+        .deadline-row:last-child { border-bottom: none; }
+        .deadline-badge {
+            font-size: 11px; font-weight: 600; padding: 3px 8px;
+            border-radius: 20px; white-space: nowrap;
+        }
+        .badge-red    { background: #fee2e2; color: #dc2626; }
+        .badge-yellow { background: #fef9c3; color: #ca8a04; }
+        .badge-green  { background: #dcfce7; color: #16a34a; }
+        .inn-card { border-radius: 12px; padding: 14px; font-size: 13px; }
+        .inn-green  { background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .inn-yellow { background: #fefce8; border: 1px solid #fde68a; }
+        .inn-red    { background: #fff1f2; border: 1px solid #fecdd3; }
+        .inn-row    { display: flex; justify-content: space-between; padding: 3px 0; }
+        .inn-label  { color: #64748b; }
+        .inn-list   { margin: 8px 0 0; padding-left: 16px; }
+        .inn-list li { margin-bottom: 3px; }
+
+        /* AI Chat */
+        .chat-wrap {
+            display: flex; flex-direction: column;
+            height: 320px; overflow-y: auto;
+            padding: 8px 4px; gap: 10px; margin-bottom: 12px;
+            scroll-behavior: smooth;
+        }
+        .chat-bubble {
+            max-width: 85%; padding: 10px 13px;
+            border-radius: 16px; font-size: 13px; line-height: 1.5; word-break: break-word;
+        }
+        .bubble-ai   { background: #f1f5f9; border-bottom-left-radius: 4px; align-self: flex-start; }
+        .bubble-user { background: #2563eb; color: white; border-bottom-right-radius: 4px; align-self: flex-end; }
+        .chat-input-row { display: flex; gap: 8px; }
+        .chat-input {
+            flex: 1; border: 2px solid #e2e8f0; border-radius: 14px;
+            padding: 11px 14px; font-size: 14px; outline: none;
+            resize: none; font-family: inherit;
+        }
+        .chat-input:focus { border-color: #2563eb; }
+        .chat-send {
+            background: #2563eb; color: white; border: none;
+            border-radius: 14px; padding: 11px 16px;
+            font-size: 20px; cursor: pointer; line-height: 1;
+        }
+        .chat-send:disabled { opacity: .5; }
+
+        /* Lang toggle */
+        .lang-row { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 14px; }
+        .lang-btn {
+            background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+            padding: 5px 10px; font-size: 12px; cursor: pointer;
+        }
+        .lang-btn.active { background: #1e293b; color: white; border-color: #1e293b; }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid #e2e8f0; border-top-color: #2563eb;
+            border-radius: 50%; animation: spin .7s linear infinite;
+            vertical-align: middle; margin-right: 4px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.45); z-index: 100;
+            align-items: flex-end; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: white; width: 100%; border-radius: 24px 24px 0 0;
+            padding: 24px 20px 32px; animation: slideUp .25s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+        .modal-close {
+            float: right; background: #f1f5f9; border: none;
+            border-radius: 50%; width: 28px; height: 28px;
+            font-size: 14px; cursor: pointer; line-height: 28px; text-align: center;
+        }
+        .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+        .cat-btn {
+            padding: 10px 8px; border-radius: 12px; border: 2px solid #e2e8f0;
+            background: white; font-size: 13px; font-weight: 500;
+            cursor: pointer; text-align: center; transition: all .15s;
+        }
+        .cat-btn.selected { border-color: #2563eb; background: #eff6ff; color: #2563eb; }
+        .amount-input {
+            width: 100%; border: 2px solid #e2e8f0; border-radius: 14px;
+            padding: 14px; font-size: 16px; margin-bottom: 14px; outline: none;
+            -moz-appearance: textfield;
+        }
+        .amount-input:focus { border-color: #2563eb; }
+        .amount-input::-webkit-outer-spin-button,
+        .amount-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .save-btn {
+            width: 100%; padding: 14px; border-radius: 14px; border: none;
+            font-size: 15px; font-weight: 700; color: white; cursor: pointer;
+        }
+        .save-btn.income  { background: #16a34a; }
+        .save-btn.expense { background: #dc2626; }
+        .save-btn:disabled { opacity: .5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<!-- Til tanlash -->
+<div class="lang-row">
+    <button class="lang-btn active" id="btn-uz" onclick="switchLang('uz')">🇺🇿 O'zbek</button>
+    <button class="lang-btn"        id="btn-ru" onclick="switchLang('ru')">🇷🇺 Русский</button>
+</div>
+
+<!-- Header -->
+<div class="header">
+    <div>
+        <h1>T-Hisob Dashboard</h1>
+        <p id="company-name">Yuklanmoqda...</p>
+    </div>
+    <div class="avatar">👤</div>
+</div>
+
+<!-- Accordion: Kirim va Chiqim -->
+<div class="acc-grid">
+    <!-- Kirim -->
+    <div class="acc-card" id="income-card" onclick="toggleAcc('income')">
+        <div class="acc-head">
+            <div class="acc-label">Umumiy Kirim</div>
+            <div id="acc-kirim" class="acc-value green">—</div>
+            <div class="acc-arrow" id="income-arrow">▼ batafsil</div>
+        </div>
+        <div class="acc-body" id="income-body">
+            <div class="acc-body-inner">
+                <div id="income-chart-wrap">
+                    <canvas id="incomeChart" height="180"></canvas>
+                </div>
+                <div id="income-chart-empty" class="chart-empty" style="display:none">
+                    Kirim yo'q
+                </div>
+                <button class="acc-add-btn"
+                        style="background:#dcfce7;color:#16a34a"
+                        onclick="event.stopPropagation(); openModal('kirim')">
+                    + Kirim qo'shish
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chiqim -->
+    <div class="acc-card" id="expense-card" onclick="toggleAcc('expense')">
+        <div class="acc-head">
+            <div class="acc-label">Umumiy Chiqim</div>
+            <div id="acc-chiqim" class="acc-value red">—</div>
+            <div class="acc-arrow" id="expense-arrow">▼ batafsil</div>
+        </div>
+        <div class="acc-body" id="expense-body">
+            <div class="acc-body-inner">
+                <div id="expense-chart-wrap">
+                    <canvas id="expenseChart" height="180"></canvas>
+                </div>
+                <div id="expense-chart-empty" class="chart-empty" style="display:none">
+                    Chiqim yo'q
+                </div>
+                <button class="acc-add-btn"
+                        style="background:#fee2e2;color:#dc2626"
+                        onclick="event.stopPropagation(); openModal('chiqim')">
+                    − Chiqim qo'shish
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sof foyda va soliq -->
+<div class="grid2">
+    <div class="card">
+        <div class="card-label">Sof Foyda</div>
+        <div id="net-profit" class="card-value green">—</div>
+    </div>
+    <div class="card border-orange">
+        <div class="card-label">Soliq Prognozi 4%</div>
+        <div id="tax-forecast" class="card-value orange">—</div>
+    </div>
+</div>
+
+<!-- Yangilash -->
+<div class="refresh-row">
+    <button class="refresh-btn" onclick="refreshDashboard()">🔄 Yangilash</button>
+</div>
+
+<!-- P&L -->
+<div class="section">
+    <div class="section-title">📊 P&L Xulosasi — <span id="month-label">—</span></div>
+    <div class="pnl-row">
+        <span class="pnl-label">Umumiy Kirim</span>
+        <span id="pnl-kirim" class="pnl-value green">—</span>
+    </div>
+    <div class="pnl-row">
+        <span class="pnl-label">Umumiy Chiqim</span>
+        <span id="pnl-chiqim" class="pnl-value red">—</span>
+    </div>
+    <div class="pnl-row divider">
+        <span class="pnl-label" style="font-weight:600">Sof Foyda</span>
+        <span id="pnl-foyda" class="pnl-value green">—</span>
+    </div>
+    <div class="pnl-row">
+        <span class="pnl-label">Taxminiy Soliq (4%)</span>
+        <span id="pnl-soliq" class="pnl-value orange">—</span>
+    </div>
+</div>
+
+<!-- Soliq Kalendari -->
+<div class="section">
+    <div class="section-title">📅 Soliq Kalendari</div>
+    <div id="tax-calendar-list">
+        <div class="chart-empty"><span class="spinner"></span></div>
+    </div>
+</div>
+
+<!-- PDF Hisobot -->
+<div class="section" style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+        <div class="section-title" style="margin-bottom:3px">📄 Oylik P&L Hisobot</div>
+        <div style="font-size:11px;color:#94a3b8">Chiroyli PDF formatda yuklab oling</div>
+    </div>
+    <button id="pdf-btn" onclick="downloadPDF()"
+            style="background:#2563eb;color:white;border:none;border-radius:12px;
+                   padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;
+                   white-space:nowrap">
+        ⬇️ PDF
+    </button>
+</div>
+
+<!-- INN Tekshirish -->
+<div class="section">
+    <div class="section-title">🛡️ Hamkor INN Xavf Tahlili</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="inn-input" type="text" inputmode="numeric" pattern="[0-9]*"
+               maxlength="9" placeholder="9 xonali INN (302644038)"
+               style="flex:1;border:2px solid #e2e8f0;border-radius:12px;
+                      padding:11px 14px;font-size:14px;outline:none">
+        <button onclick="checkINN()"
+                style="background:#1e293b;color:white;border:none;border-radius:12px;
+                       padding:11px 16px;font-size:13px;font-weight:600;cursor:pointer">
+            Tekshir
+        </button>
+    </div>
+    <div id="inn-result"></div>
+</div>
+
+<!-- AI Maslahatchi -->
+<div class="section">
+    <div class="section-title">🤖 <span data-i18n="ai_title">AI Moliyaviy Maslahatchi</span></div>
+    <div class="chat-wrap" id="chat-wrap">
+        <div class="chat-bubble bubble-ai" id="chat-greeting"></div>
+    </div>
+    <div class="chat-input-row">
+        <textarea class="chat-input" id="chat-input" rows="1"
+                  placeholder="" data-i18n-placeholder="ai_placeholder"
+                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+        <button class="chat-send" id="chat-send-btn" onclick="sendChat()">➤</button>
+    </div>
+</div>
+
+<div id="status" class="status"><span class="spinner"></span> Yuklanmoqda...</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closeModal()">✕</button>
+        <div class="modal-title" id="modal-title">Kategoriyani tanlang</div>
+        <div class="cat-grid" id="cat-grid"></div>
+        <input class="amount-input" id="amount-input"
+               type="text" inputmode="numeric" pattern="[0-9]*"
+               placeholder="Summani kiriting (so'm)">
+        <button class="save-btn" id="save-btn" onclick="saveTransaction()">Saqlash</button>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) { tg.expand(); tg.ready(); }
+
+    const H = { "ngrok-skip-browser-warning": "any" };
+    const fmt = (n) => Number(Math.round(n)).toLocaleString("uz-UZ") + " so'm";
+
+    /* ── i18n ── */
+    const I18N = {
+        uz: {
+            ai_title:        "AI Moliyaviy Maslahatchi",
+            ai_placeholder:  "Soliq yoki moliya haqida savol bering...",
+            ai_greeting:     "Salom! Men sizning moliyaviy ma'lumotlaringizni bilaman. Savol bering — aniq javob beraman. 🤖",
+            ai_thinking:     "Javob tayyorlanmoqda...",
+            refresh:         "🔄 Yangilash",
+            pdf_btn:         "⬇️ PDF",
+            month_label:     "oy",
+            income_label:    "Umumiy Kirim",
+            expense_label:   "Umumiy Chiqim",
+            net_profit:      "Sof Foyda",
+            tax_label:       "Soliq Prognozi 4%",
+            pnl_title:       "📊 P&L Xulosasi",
+            tax_cal_title:   "📅 Soliq Kalendari",
+            pdf_title:       "📄 Oylik P&L Hisobot",
+            pdf_sub:         "Chiroyli PDF formatda yuklab oling",
+            inn_title:       "🛡️ Hamkor INN Xavf Tahlili",
+            inn_placeholder: "9 xonali INN (302644038)",
+            inn_btn:         "Tekshir",
+            inn_empty:       "Chiqim tranzaksiyalari yo'q",
+            income_empty:    "Kirim tranzaksiyalari yo'q",
+            updated:         "✅ Yangilandi:",
+            no_deadline:     "Muddatlar topilmadi",
+            today:           "Bugun!",
+            days:            "kun",
+        },
+        ru: {
+            ai_title:        "AI Финансовый советник",
+            ai_placeholder:  "Задайте вопрос о налогах или финансах...",
+            ai_greeting:     "Привет! Я знаю ваше финансовое состояние. Задайте вопрос — дам точный ответ. 🤖",
+            ai_thinking:     "Подготовка ответа...",
+            refresh:         "🔄 Обновить",
+            pdf_btn:         "⬇️ PDF",
+            month_label:     "мес.",
+            income_label:    "Общий доход",
+            expense_label:   "Общий расход",
+            net_profit:      "Чистая прибыль",
+            tax_label:       "Прогноз налога 4%",
+            pnl_title:       "📊 Отчёт P&L",
+            tax_cal_title:   "📅 Налоговый календарь",
+            pdf_title:       "📄 Ежемесячный отчёт P&L",
+            pdf_sub:         "Скачать красивый PDF",
+            inn_title:       "🛡️ Проверка ИНН контрагента",
+            inn_placeholder: "9-значный ИНН (302644038)",
+            inn_btn:         "Проверить",
+            inn_empty:       "Нет расходов",
+            income_empty:    "Нет доходов",
+            updated:         "✅ Обновлено:",
+            no_deadline:     "Сроков не найдено",
+            today:           "Сегодня!",
+            days:            "дн.",
+        },
+    };
+
+    let currentLang = "uz";
+
+    function i(key) { return I18N[currentLang][key] || I18N.uz[key] || key; }
+
+    function applyTranslations() {
+        document.querySelectorAll("[data-i18n]").forEach(el => {
+            const k = el.getAttribute("data-i18n");
+            el.textContent = i(k);
+        });
+        document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+            el.placeholder = i(el.getAttribute("data-i18n-placeholder"));
+        });
+    }
+
+    function switchLang(lang) {
+        currentLang = lang;
+        document.getElementById("btn-uz").classList.toggle("active", lang === "uz");
+        document.getElementById("btn-ru").classList.toggle("active", lang === "ru");
+        applyTranslations();
+        // Greet again in new language
+        document.getElementById("chat-greeting").textContent = i("ai_greeting");
+    }
+
+    const INCOME_COLORS  = ["#10b981","#34d399","#059669","#6ee7b7","#047857","#a7f3d0"];
+    const EXPENSE_COLORS = ["#ef4444","#f97316","#f59e0b","#dc2626","#fb923c","#fbbf24"];
+
+    let incomeChart  = null;
+    let expenseChart = null;
+    let categories   = { kirim: [], chiqim: [] };
+    let modalType    = "kirim";
+    let selectedCat  = null;
+
+    /* ── Accordion ── */
+    function toggleAcc(type) {
+        const body  = document.getElementById(type === "income" ? "income-body" : "expense-body");
+        const arrow = document.getElementById(type === "income" ? "income-arrow" : "expense-arrow");
+        const open  = body.classList.toggle("open");
+        arrow.textContent = open ? "▲ yopish" : "▼ batafsil";
+    }
+
+    /* ── Charts ── */
+    function makeChart(canvasId, labels, values, colors) {
+        const ctx = document.getElementById(canvasId).getContext("2d");
+        return new Chart(ctx, {
+            type: "doughnut",
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors.slice(0, labels.length),
+                    borderWidth: 2, borderColor: "#fff"
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: "bottom", labels: { font: { size: 11 }, padding: 8 } },
+                    tooltip: { callbacks: { label: (c) => " " + fmt(c.parsed) } }
+                }
+            }
+        });
+    }
+
+    function renderCharts(stats) {
+        const iWrap  = document.getElementById("income-chart-wrap");
+        const iEmpty = document.getElementById("income-chart-empty");
+        if (stats.income_chart.labels.length) {
+            iWrap.style.display = "block"; iEmpty.style.display = "none";
+            if (incomeChart) incomeChart.destroy();
+            incomeChart = makeChart("incomeChart", stats.income_chart.labels, stats.income_chart.values, INCOME_COLORS);
+        } else {
+            iWrap.style.display = "none"; iEmpty.style.display = "block";
+        }
+
+        const eWrap  = document.getElementById("expense-chart-wrap");
+        const eEmpty = document.getElementById("expense-chart-empty");
+        if (stats.expense_chart.labels.length) {
+            eWrap.style.display = "block"; eEmpty.style.display = "none";
+            if (expenseChart) expenseChart.destroy();
+            expenseChart = makeChart("expenseChart", stats.expense_chart.labels, stats.expense_chart.values, EXPENSE_COLORS);
+        } else {
+            eWrap.style.display = "none"; eEmpty.style.display = "block";
+        }
+    }
+
+    /* ── Dashboard refresh ── */
+    async function refreshDashboard() {
+        document.getElementById("status").innerHTML =
+            '<span class="spinner"></span> Yangilanmoqda...';
+
+        const userId    = tg?.initDataUnsafe?.user?.id;
+        const firstName = tg?.initDataUnsafe?.user?.first_name;
+        const qs = userId ? `?telegram_id=${userId}` : "";
+
+        try {
+            const [pnlRes, statsRes, catRes] = await Promise.all([
+                fetch(`/reports/pnl${qs}`,         { headers: H }),
+                fetch(`/api/dashboard-stats${qs}`, { headers: H }),
+                fetch(`/api/categories`,            { headers: H }),
+            ]);
+            if (!pnlRes.ok)   throw new Error("HTTP " + pnlRes.status);
+            if (!statsRes.ok) throw new Error("HTTP " + statsRes.status);
+
+            const d     = await pnlRes.json();
+            const stats = await statsRes.json();
+            categories  = catRes.ok ? await catRes.json() : categories;
+
+            const profit = d.sof_foyda;
+            const profitEl = document.getElementById("net-profit");
+            profitEl.innerText = (profit >= 0 ? "+" : "") + fmt(profit);
+            profitEl.className = "card-value " + (profit >= 0 ? "green" : "red");
+
+            document.getElementById("acc-kirim").innerText    = fmt(d.total_kirim);
+            document.getElementById("acc-chiqim").innerText   = fmt(d.total_chiqim);
+            document.getElementById("tax-forecast").innerText = fmt(d.soliq);
+            document.getElementById("month-label").innerText  = d.month;
+            document.getElementById("pnl-kirim").innerText    = fmt(d.total_kirim);
+            document.getElementById("pnl-chiqim").innerText   = fmt(d.total_chiqim);
+            document.getElementById("pnl-foyda").innerText    = (profit >= 0 ? "+" : "") + fmt(profit);
+            document.getElementById("pnl-foyda").className    = "pnl-value " + (profit >= 0 ? "green" : "red");
+            document.getElementById("pnl-soliq").innerText    = fmt(d.soliq);
+            document.getElementById("company-name").innerText =
+                firstName ? firstName + "ning hisobi" : d.month;
+
+            renderCharts(stats);
+            const uzb = new Date().toLocaleTimeString("uz-UZ", { timeZone: "Asia/Tashkent", hour: "2-digit", minute: "2-digit" });
+            document.getElementById("status").innerText = "✅ Yangilandi: " + uzb + " (UZB)";
+        } catch (err) {
+            document.getElementById("status").innerText = "❌ " + err.message;
+            console.error(err);
+        }
+    }
+
+    /* ── Modal ── */
+    function openModal(type) {
+        modalType   = type;
+        selectedCat = null;
+        const isIncome = type === "kirim";
+
+        document.getElementById("modal-title").textContent =
+            isIncome ? "📈 Kirim kategoriyasi" : "📉 Chiqim kategoriyasi";
+        document.getElementById("save-btn").className =
+            "save-btn " + (isIncome ? "income" : "expense");
+        document.getElementById("amount-input").value = "";
+
+        const cats = categories[type] || [];
+        const grid = document.getElementById("cat-grid");
+        grid.innerHTML = cats.map(c =>
+            `<button class="cat-btn" onclick="selectCat(this,'${c}')">${c}</button>`
+        ).join("");
+
+        document.getElementById("modal").classList.add("open");
+        setTimeout(() => document.getElementById("amount-input").focus(), 300);
+    }
+
+    function closeModal(e) {
+        if (!e || e.target === document.getElementById("modal"))
+            document.getElementById("modal").classList.remove("open");
+    }
+
+    function selectCat(btn, cat) {
+        document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        selectedCat = cat;
+    }
+
+    async function saveTransaction() {
+        const userId = tg?.initDataUnsafe?.user?.id;
+        if (!userId) { alert("Telegram foydalanuvchisi aniqlanmadi"); return; }
+        if (!selectedCat) { alert("Kategoriyani tanlang"); return; }
+
+        const raw = document.getElementById("amount-input").value.replace(/\s/g, "").replace(/,/g, "");
+        const amount = parseFloat(raw);
+        if (!amount || amount <= 0) { alert("To'g'ri summa kiriting"); return; }
+
+        const btn = document.getElementById("save-btn");
+        btn.disabled = true;
+        btn.textContent = "Saqlanmoqda...";
+
+        try {
+            const res = await fetch("/api/transactions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...H },
+                body: JSON.stringify({
+                    telegram_id: userId,
+                    type: modalType,
+                    category: selectedCat,
+                    amount,
+                }),
+            });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            closeModal();
+            await refreshDashboard();
+        } catch (err) {
+            alert("Xatolik: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Saqlash";
+        }
+    }
+
+    /* ── Soliq Kalendari ── */
+    async function loadTaxCalendar(userId) {
+        const qs  = userId ? `?telegram_id=${userId}` : "";
+        const res = await fetch(`/api/tax-calendar${qs}`, { headers: H });
+        if (!res.ok) return;
+        const { deadlines } = await res.json();
+        const el = document.getElementById("tax-calendar-list");
+        if (!deadlines.length) { el.innerHTML = '<div class="chart-empty">Muddatlar topilmadi</div>'; return; }
+        el.innerHTML = deadlines.map(d => {
+            const badgeCls = d.days_left <= 3 ? "badge-red" : d.days_left <= 7 ? "badge-yellow" : "badge-green";
+            const dayText  = d.days_left === 0 ? "Bugun!" : d.days_left + " kun";
+            const est      = d.estimated > 0 ? `<div style="font-size:11px;color:#64748b">~${fmt(d.estimated)}</div>` : "";
+            return `<div class="deadline-row">
+                <div>
+                    <div>${d.emoji} ${d.type}</div>
+                    <div style="font-size:11px;color:#94a3b8">${d.date}</div>
+                    ${est}
+                </div>
+                <span class="deadline-badge ${badgeCls}">${dayText}</span>
+            </div>`;
+        }).join("");
+    }
+
+    /* ── PDF Yuklab olish ── */
+    function downloadPDF() {
+        const userId = tg?.initDataUnsafe?.user?.id;
+        if (!userId) { alert("Telegram foydalanuvchisi aniqlanmadi"); return; }
+        const btn = document.getElementById("pdf-btn");
+        btn.textContent = "⏳ ...";
+        btn.disabled = true;
+        const link = document.createElement("a");
+        link.href = `/reports/download-pdf?telegram_id=${userId}`;
+        link.download = "T-Hisob_Hisobot.pdf";
+        link.click();
+        setTimeout(() => { btn.textContent = "⬇️ PDF"; btn.disabled = false; }, 2000);
+    }
+
+    /* ── INN Tekshirish ── */
+    async function checkINN() {
+        const inn = document.getElementById("inn-input").value.trim();
+        const res_el = document.getElementById("inn-result");
+        if (inn.length !== 9 || !/^\d+$/.test(inn)) {
+            res_el.innerHTML = '<div class="inn-card inn-red">❌ INN 9 ta raqamdan iborat bo\'lishi kerak</div>';
+            return;
+        }
+        res_el.innerHTML = '<div class="chart-empty"><span class="spinner"></span> Tekshirilmoqda...</div>';
+        try {
+            const r = await fetch(`/api/check_inn?inn=${inn}`, { headers: H });
+            if (!r.ok) { res_el.innerHTML = '<div class="inn-card inn-red">❌ Xatolik yuz berdi</div>'; return; }
+            const d = await r.json();
+            const cls   = { green: "inn-green", yellow: "inn-yellow", red: "inn-red" }[d.level];
+            const icon  = { green: "🟢", yellow: "🟡", red: "🔴" }[d.level];
+            const label = { green: "PAST — Xavfsiz", yellow: "O'RTA — Ehtiyot", red: "YUQORI — Xavfli!" }[d.level];
+            const inds  = d.indicators.map(i => `<li>${i}</li>`).join("");
+            const recs  = d.recommendations.map(r => `<li>${r}</li>`).join("");
+            res_el.innerHTML = `
+                <div class="inn-card ${cls}">
+                    <div style="font-weight:700;font-size:14px;margin-bottom:8px">
+                        ${icon} INN ${d.inn} — Xavf: ${label}
+                    </div>
+                    <div class="inn-row"><span class="inn-label">Turi</span><span>${d.company_type}</span></div>
+                    <div class="inn-row"><span class="inn-label">Hudud</span><span>${d.region}</span></div>
+                    <div class="inn-row"><span class="inn-label">Ball</span><span>${d.score}/100</span></div>
+                    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#475569">Ko'rsatkichlar:</div>
+                    <ul class="inn-list" style="font-size:12px">${inds}</ul>
+                    <div style="margin-top:8px;font-size:12px;font-weight:600;color:#475569">Tavsiyalar:</div>
+                    <ul class="inn-list" style="font-size:12px">${recs}</ul>
+                </div>`;
+        } catch (e) {
+            res_el.innerHTML = `<div class="inn-card inn-red">❌ ${e.message}</div>`;
+        }
+    }
+
+    // Enter bilan INN tekshirish
+    document.getElementById("inn-input")?.addEventListener("keydown", e => {
+        if (e.key === "Enter") checkINN();
+    });
+
+    /* ── AI Chat ── */
+    function addBubble(text, isUser) {
+        const wrap = document.getElementById("chat-wrap");
+        const div  = document.createElement("div");
+        div.className = "chat-bubble " + (isUser ? "bubble-user" : "bubble-ai");
+        div.textContent = text;
+        wrap.appendChild(div);
+        wrap.scrollTop = wrap.scrollHeight;
+        return div;
+    }
+
+    async function sendChat() {
+        const input   = document.getElementById("chat-input");
+        const sendBtn = document.getElementById("chat-send-btn");
+        const msg     = input.value.trim();
+        const userId  = tg?.initDataUnsafe?.user?.id;
+        if (!msg) return;
+
+        input.value   = "";
+        input.style.height = "";
+        addBubble(msg, true);
+
+        sendBtn.disabled = true;
+        const thinking = addBubble(i("ai_thinking"), false);
+        thinking.style.color = "#94a3b8";
+        thinking.style.fontStyle = "italic";
+
+        try {
+            const res = await fetch("/api/ai-chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...H },
+                body: JSON.stringify({
+                    telegram_id: userId || 0,
+                    message: msg,
+                    lang: currentLang,
+                }),
+            });
+            const data = await res.json();
+            thinking.textContent = data.answer || data.detail || "Xatolik";
+            thinking.style.color = "";
+            thinking.style.fontStyle = "";
+        } catch (e) {
+            thinking.textContent = "❌ " + e.message;
+        } finally {
+            sendBtn.disabled = false;
+        }
+    }
+
+    // Auto-resize textarea
+    document.getElementById("chat-input")?.addEventListener("input", function() {
+        this.style.height = "auto";
+        this.style.height = Math.min(this.scrollHeight, 100) + "px";
+    });
+
+    window.onload = async () => {
+        // Til aniqlash: Telegram tili yoki "uz"
+        const tgLang = tg?.initDataUnsafe?.user?.language_code || "uz";
+        const lang   = tgLang.startsWith("ru") ? "ru" : "uz";
+        currentLang  = lang;
+        document.getElementById("btn-uz").classList.toggle("active", lang === "uz");
+        document.getElementById("btn-ru").classList.toggle("active", lang === "ru");
+        applyTranslations();
+
+        document.getElementById("chat-greeting").textContent = i("ai_greeting");
+
+        await refreshDashboard();
+        const userId = tg?.initDataUnsafe?.user?.id;
+        await loadTaxCalendar(userId);
+    };
+</script>
+</body>
+</html>
