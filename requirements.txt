@@ -3,3 +3,4 @@ uvicorn
 sqlalchemy
 aiogram
 openai
+python-dotenv
