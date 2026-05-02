@@ -5,3 +5,4 @@ aiogram
 openai
 python-dotenv
 reportlab
+httpx
