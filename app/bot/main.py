@@ -430,8 +430,10 @@ async def tax_calendar_scheduler():
             db.close()
 
 
-async def start_bot():
-    if not bot:
-        return
-    asyncio.create_task(tax_calendar_scheduler())
-    await dp.start_polling(bot)
+async def setup_webhook(webhook_url: str):
+    if bot:
+        await bot.set_webhook(webhook_url, drop_pending_updates=True)
+
+async def delete_webhook():
+    if bot:
+        await bot.delete_webhook()

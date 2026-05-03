@@ -1,5 +1,6 @@
 import asyncio
 import calendar
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -9,18 +10,17 @@ def now_uzb() -> datetime:
     return datetime.now(UZB)
 
 def month_start_utc(dt: datetime) -> datetime:
-    """O'zbekiston vaqti bo'yicha oy boshini UTC ga aylantiradi."""
     ms_uzb = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return (ms_uzb - timedelta(hours=5)).replace(tzinfo=None)
 
 import uvicorn
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func
 
-from app.bot.main import start_bot, _next_tax_deadlines
+from app.bot.main import bot, dp, _next_tax_deadlines, setup_webhook, delete_webhook
 from app.db.session import engine, Base, SessionLocal
 from app.models.models import Transaction, UserSettings
 from app.services.pdf_service import generate_monthly_report_pdf
@@ -52,9 +52,25 @@ def parse_dt(value) -> datetime | None:
 
 @app.on_event("startup")
 async def startup():
-    import os
-    if os.getenv("RUN_BOT") == "1":
-        asyncio.create_task(start_bot())
+    if os.getenv("RUN_BOT") == "1" and bot:
+        web_url = os.getenv("WEB_APP_URL", "")
+        if web_url:
+            await setup_webhook(f"{web_url}/webhook")
+
+@app.on_event("shutdown")
+async def shutdown():
+    if bot:
+        await delete_webhook()
+
+@app.post("/webhook")
+async def telegram_webhook(request: Request):
+    from aiogram.types import Update
+    if not bot:
+        return Response(status_code=200)
+    data = await request.json()
+    update = Update.model_validate(data)
+    await dp.feed_update(bot, update)
+    return Response(status_code=200)
 
 
 @app.get("/")
