@@ -50,6 +50,13 @@ def parse_dt(value) -> datetime | None:
         return None
 
 
+@app.on_event("startup")
+async def startup():
+    if bot:
+        web_url = os.getenv("WEB_APP_URL", "")
+        if web_url:
+            await setup_webhook(f"{web_url}/webhook")
+
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     from aiogram.types import Update
