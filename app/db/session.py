@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # SQLite uchun maxsus sozlama (check_same_thread) qo'shildi
-engine = create_engine(
-    os.getenv("DATABASE_URL"), connect_args={"check_same_thread": False}
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///t_hisob.db")
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
