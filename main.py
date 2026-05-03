@@ -50,18 +50,6 @@ def parse_dt(value) -> datetime | None:
         return None
 
 
-@app.on_event("startup")
-async def startup():
-    if os.getenv("RUN_BOT") == "1" and bot:
-        web_url = os.getenv("WEB_APP_URL", "")
-        if web_url:
-            await setup_webhook(f"{web_url}/webhook")
-
-@app.on_event("shutdown")
-async def shutdown():
-    if bot:
-        await delete_webhook()
-
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     from aiogram.types import Update
@@ -71,6 +59,17 @@ async def telegram_webhook(request: Request):
     update = Update.model_validate(data)
     await dp.feed_update(bot, update)
     return Response(status_code=200)
+
+@app.get("/api/setup-webhook")
+async def api_setup_webhook():
+    if not bot:
+        return JSONResponse(status_code=400, content={"error": "BOT_TOKEN not set"})
+    web_url = os.getenv("WEB_APP_URL", "")
+    if not web_url:
+        return JSONResponse(status_code=400, content={"error": "WEB_APP_URL not set"})
+    await setup_webhook(f"{web_url}/webhook")
+    info = await bot.get_webhook_info()
+    return {"ok": True, "webhook_url": info.url}
 
 
 @app.get("/")
